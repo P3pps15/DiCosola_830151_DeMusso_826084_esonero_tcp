@@ -160,6 +160,32 @@ struct sockaddr_in build_server_address(unsigned short port) {
 	return server_addr;
 }
 
+int create_listening_socket(unsigned short port) {
+	int listen_socket = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
+	if (listen_socket < 0) {
+		error_handler("socket() failed");
+	}
+
+	int enable = 1;
+	if (setsockopt(listen_socket, SOL_SOCKET, SO_REUSEADDR, (char *)&enable, sizeof(enable)) < 0) {
+		closesocket(listen_socket);
+		error_handler("setsockopt() failed");
+	}
+
+	struct sockaddr_in server_addr = build_server_address(port);
+	if (bind(listen_socket, (struct sockaddr *)&server_addr, sizeof(server_addr)) < 0) {
+		closesocket(listen_socket);
+		error_handler("bind() failed");
+	}
+
+	if (listen(listen_socket, QUEUE_SIZE) < 0) {
+		closesocket(listen_socket);
+		error_handler("listen() failed");
+	}
+
+	return listen_socket;
+}
+
 int main(int argc, char *argv[]) {
 
 	// TODO: Implement server logic
