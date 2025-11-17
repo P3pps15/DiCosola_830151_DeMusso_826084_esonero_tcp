@@ -83,6 +83,37 @@ int parse_request(const char *request_arg, weather_request_t *out_request) {
 	return 0;
 }
 
+int connect_to_server(const char *server_address, unsigned short port) {
+	const char *address = server_address != NULL ? server_address : DEFAULT_SERVER_ADDRESS;
+
+	int client_socket = socket(PF_INET, SOCK_STREAM, IPPROTO_TCP);
+	if (client_socket < 0) {
+		return -1;
+	}
+
+	struct sockaddr_in sad;
+	memset(&sad, 0, sizeof(sad));
+	sad.sin_family = AF_INET;
+	sad.sin_port = htons(port);
+
+	int pton_result = inet_pton(AF_INET, address, &sad.sin_addr);
+	if (pton_result <= 0) {
+		struct hostent *host = gethostbyname(address);
+		if (host == NULL || host->h_addr_list == NULL || host->h_addr_list[0] == NULL) {
+			closesocket(client_socket);
+			return -1;
+		}
+		memcpy(&sad.sin_addr, host->h_addr_list[0], host->h_length);
+	}
+
+	if (connect(client_socket, (struct sockaddr*) &sad, sizeof(sad)) < 0) {
+		closesocket(client_socket);
+		return -1;
+	}
+
+	return client_socket;
+}
+
 int main(int argc, char *argv[]) {
 
 	// TODO: Implement client logic
