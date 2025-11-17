@@ -8,9 +8,9 @@
  */
 
 #if defined WIN32
-#include <winsock.h>
+#include <winsock2.h>
+#include <ws2tcpip.h>
 #else
-#include <string.h>
 #include <unistd.h>
 #include <sys/types.h>
 #include <sys/socket.h>
@@ -20,8 +20,10 @@
 #define closesocket close
 #endif
 
+#include <ctype.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 #include "protocol.h"
 
 #define NO_ERROR 0
@@ -30,6 +32,55 @@ void clearwinsock() {
 #if defined WIN32
 	WSACleanup();
 #endif
+}
+
+void error_handler(const char *message) {
+	perror(message);
+	clearwinsock();
+	exit(EXIT_FAILURE);
+}
+
+int parse_request(const char *request_arg, weather_request_t *out_request) {
+	if (request_arg == NULL || out_request == NULL) {
+		return -1;
+	}
+
+	// Skip leading whitespace
+	while (*request_arg == ' ' || *request_arg == '\t') {
+		++request_arg;
+	}
+
+	if (*request_arg == '\0') {
+		return -1;
+	}
+
+	out_request->type = (char) tolower((unsigned char) *request_arg);
+
+	const char *city_start = request_arg + 1;
+	while (*city_start == ' ' || *city_start == '\t') {
+		++city_start;
+	}
+
+	if (*city_start == '\0') {
+		return -1;
+	}
+
+	strncpy(out_request->city, city_start, MAX_CITY_LEN - 1);
+	out_request->city[MAX_CITY_LEN - 1] = '\0';
+
+	// Trim trailing whitespace from city
+	size_t len = strlen(out_request->city);
+	while (len > 0) {
+		char last_char = out_request->city[len - 1];
+		if (last_char == ' ' || last_char == '\t' || last_char == '\n' || last_char == '\r') {
+			out_request->city[len - 1] = '\0';
+			--len;
+		} else {
+			break;
+		}
+	}
+
+	return 0;
 }
 
 int main(int argc, char *argv[]) {
@@ -42,14 +93,61 @@ int main(int argc, char *argv[]) {
 	int result = WSAStartup(MAKEWORD(2,2), &wsa_data);
 	if (result != NO_ERROR) {
 		printf("Error at WSAStartup()\n");
-		return 0;
+		return EXIT_SUCCESS;
 	}
 #endif
 
-	int my_socket;
+	// create client socket
+	int c_socket;
+	c_socket = socket(PF_INET, SOCK_STREAM, IPPROTO_TCP);
+	if (c_socket < 0) {
+		error_handler("socket creation failed.\n");
+		closesocket(c_socket);
+		clearwinsock();
+		return EXIT_FAILURE;
+	}
 
-	// TODO: Create socket
-	// my_socket = socket(...);
+// set connection settings
+	struct sockaddr_in sad;
+	memset(&sad, 0, sizeof(sad));
+	sad.sin_family = AF_INET;
+	sad.sin_addr.s_addr = inet_addr("127.0.0.1"); // IP del server
+	sad.sin_port = htons(PROTO_PORT); // Server port
+
+	// connection
+	if (connect(c_socket, (struct sockaddr*) &sad, sizeof(sad)) < 0) {
+		error_handler("Failed to connect.\n");
+		closesocket(c_socket);
+		return EXIT_FAILURE;
+	}
+
+	// receive from server
+	char buffer[BUFFER_SIZE];
+	memset(buffer, '\0', BUFFER_SIZE);
+	if ((recv(c_socket, buffer, BUFFER_SIZE - 1, 0)) <= 0) {
+		error_handler("recv() failed or connection closed prematurely");
+		closesocket(c_socket);
+		return EXIT_FAILURE;
+	}
+	printf("%s\n", buffer); // Print the echo buffer
+
+
+		MessageStruct msg;
+
+	// 1. ALLOCAZIONE DELLA MEMORIA per i puntatori A e B
+	msg.A = (char*)malloc(MAX_MSG_LEN);
+	msg.B = (char*)malloc(MAX_MSG_LEN);
+
+	if (msg.A == NULL || msg.B == NULL) {
+		errorhandler("Errore nell'allocazione di memoria.\n");
+		// Cleanup se l'allocazione fallisce
+		if (msg.A) free(msg.A);
+		if (msg.B) free(msg.B);
+		closesocket(c_socket);
+		clearwinsock();
+		return EXIT_FAILURE;
+	}
+
 
 	// TODO: Configure server address
 	// struct sockaddr_in server_addr;
