@@ -2,6 +2,10 @@ CC := gcc
 CFLAGS := -Wall -Wextra -pedantic -std=c11
 LDFLAGS :=
 
+ifeq ($(OS),Windows_NT)
+LDFLAGS += -lws2_32
+endif
+
 BUILD_DIR := build
 CLIENT_SRC := client-project/src/main.c
 SERVER_SRC := server-project/src/main.c
