@@ -7,7 +7,7 @@
  * portable across Windows, Linux and macOS.
  */
 
-#if defined WIN32
+#if defined(_WIN32) || defined(WIN32)
 #include <winsock2.h>
 #include <ws2tcpip.h>
 #else
@@ -24,12 +24,14 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+
+#ifndef NO_ERROR
+#define NO_ERROR 0
+#endif
 #include "protocol.h"
 
-#define NO_ERROR 0
-
 void clearwinsock() {
-#if defined WIN32
+#if defined(_WIN32) || defined(WIN32)
 	WSACleanup();
 #endif
 }
@@ -96,14 +98,26 @@ int connect_to_server(const char *server_address, unsigned short port) {
 	sad.sin_family = AF_INET;
 	sad.sin_port = htons(port);
 
-	int pton_result = inet_pton(AF_INET, address, &sad.sin_addr);
-	if (pton_result <= 0) {
+	int resolved = 0;
+#if defined(_WIN32) || defined(WIN32)
+	unsigned long addr_numeric = inet_addr(address);
+	if (addr_numeric != INADDR_NONE) {
+		sad.sin_addr.s_addr = addr_numeric;
+		resolved = 1;
+	}
+#else
+	if (inet_pton(AF_INET, address, &sad.sin_addr) > 0) {
+		resolved = 1;
+	}
+#endif
+
+	if (!resolved) {
 		struct hostent *host = gethostbyname(address);
 		if (host == NULL || host->h_addr_list == NULL || host->h_addr_list[0] == NULL) {
 			closesocket(client_socket);
 			return -1;
 		}
-		memcpy(&sad.sin_addr, host->h_addr_list[0], host->h_length);
+		memcpy(&sad.sin_addr, host->h_addr_list[0], (size_t) host->h_length);
 	}
 
 	if (connect(client_socket, (struct sockaddr*) &sad, sizeof(sad)) < 0) {
@@ -218,87 +232,123 @@ int format_response_message(const weather_response_t *response,
 }
 
 int main(int argc, char *argv[]) {
+	int exit_code = EXIT_FAILURE;
+	int client_socket = -1;
+	weather_request_t request;
+	weather_response_t response;
+	char response_message[RESPONSE_MESSAGE_LEN];
+	char server_ip[INET_ADDRSTRLEN] = {0};
+	char server_address[BUFFER_SIZE];
+	unsigned short server_port = DEFAULT_SERVER_PORT;
+	const char usage_format[] = "Usage: %s [-s server] [-p port] -r \"type city\"\n";
 
-	// TODO: Implement client logic
+	memset(&request, 0, sizeof(request));
+	memset(&response, 0, sizeof(response));
+	memset(response_message, 0, sizeof(response_message));
+	memset(server_address, 0, sizeof(server_address));
+	strncpy(server_address, DEFAULT_SERVER_ADDRESS, sizeof(server_address) - 1);
 
-#if defined WIN32
-	// Initialize Winsock
+#if defined(_WIN32) || defined(WIN32)
 	WSADATA wsa_data;
-	int result = WSAStartup(MAKEWORD(2,2), &wsa_data);
-	if (result != NO_ERROR) {
-		printf("Error at WSAStartup()\n");
-		return EXIT_SUCCESS;
+	int startup_result = WSAStartup(MAKEWORD(2,2), &wsa_data);
+	if (startup_result != NO_ERROR) {
+		fprintf(stderr, "Error at WSAStartup()\n");
+		return EXIT_FAILURE;
 	}
 #endif
 
-	// create client socket
-	int c_socket;
-	c_socket = socket(PF_INET, SOCK_STREAM, IPPROTO_TCP);
-	if (c_socket < 0) {
-		error_handler("socket creation failed.\n");
-		closesocket(c_socket);
-		clearwinsock();
-		return EXIT_FAILURE;
+	// Parse CLI arguments
+	int request_present = 0;
+	for (int i = 1; i < argc; ++i) {
+		if (strcmp(argv[i], "-s") == 0) {
+			if (i + 1 >= argc) {
+				fprintf(stderr, "Missing value for -s option\n");
+				fprintf(stderr, usage_format, argv[0]);
+				goto cleanup;
+			}
+			strncpy(server_address, argv[++i], sizeof(server_address) - 1);
+			server_address[sizeof(server_address) - 1] = '\0';
+		} else if (strcmp(argv[i], "-p") == 0) {
+			if (i + 1 >= argc) {
+				fprintf(stderr, "Missing value for -p option\n");
+				fprintf(stderr, usage_format, argv[0]);
+				goto cleanup;
+			}
+			char *endptr = NULL;
+			unsigned long port_value = strtoul(argv[++i], &endptr, 10);
+			if (endptr == NULL || *endptr != '\0' || port_value == 0 || port_value > 65535) {
+				fprintf(stderr, "Invalid port value: %s\n", argv[i]);
+				fprintf(stderr, usage_format, argv[0]);
+				goto cleanup;
+			}
+			server_port = (unsigned short) port_value;
+		} else if (strcmp(argv[i], "-r") == 0) {
+			if (i + 1 >= argc) {
+				fprintf(stderr, "Missing value for -r option\n");
+				fprintf(stderr, usage_format, argv[0]);
+				goto cleanup;
+			}
+			if (parse_request(argv[++i], &request) != 0) {
+				fprintf(stderr, "Invalid request format. Expected \"type city\".\n");
+				fprintf(stderr, usage_format, argv[0]);
+				goto cleanup;
+			}
+			request_present = 1;
+		} else {
+			fprintf(stderr, "Unknown argument: %s\n", argv[i]);
+			fprintf(stderr, usage_format, argv[0]);
+			goto cleanup;
+		}
 	}
 
-// set connection settings
-	struct sockaddr_in sad;
-	memset(&sad, 0, sizeof(sad));
-	sad.sin_family = AF_INET;
-	sad.sin_addr.s_addr = inet_addr("127.0.0.1"); // IP del server
-	sad.sin_port = htons(PROTO_PORT); // Server port
-
-	// connection
-	if (connect(c_socket, (struct sockaddr*) &sad, sizeof(sad)) < 0) {
-		error_handler("Failed to connect.\n");
-		closesocket(c_socket);
-		return EXIT_FAILURE;
+	if (!request_present) {
+		fprintf(stderr, "Missing required -r option\n");
+		fprintf(stderr, usage_format, argv[0]);
+		goto cleanup;
 	}
 
-	// receive from server
-	char buffer[BUFFER_SIZE];
-	memset(buffer, '\0', BUFFER_SIZE);
-	if ((recv(c_socket, buffer, BUFFER_SIZE - 1, 0)) <= 0) {
-		error_handler("recv() failed or connection closed prematurely");
-		closesocket(c_socket);
-		return EXIT_FAILURE;
-	}
-	printf("%s\n", buffer); // Print the echo buffer
-
-
-		MessageStruct msg;
-
-	// 1. ALLOCAZIONE DELLA MEMORIA per i puntatori A e B
-	msg.A = (char*)malloc(MAX_MSG_LEN);
-	msg.B = (char*)malloc(MAX_MSG_LEN);
-
-	if (msg.A == NULL || msg.B == NULL) {
-		errorhandler("Errore nell'allocazione di memoria.\n");
-		// Cleanup se l'allocazione fallisce
-		if (msg.A) free(msg.A);
-		if (msg.B) free(msg.B);
-		closesocket(c_socket);
-		clearwinsock();
-		return EXIT_FAILURE;
+	client_socket = connect_to_server(server_address, server_port);
+	if (client_socket < 0) {
+		fprintf(stderr, "Unable to connect to %s:%u\n", server_address, server_port);
+		goto cleanup;
 	}
 
+	if (send_weather_request(client_socket, &request) != 0) {
+		fprintf(stderr, "Failed to send weather request\n");
+		goto cleanup;
+	}
 
-	// TODO: Configure server address
-	// struct sockaddr_in server_addr;
-	// ...
+	if (receive_weather_response(client_socket, &response) != 0) {
+		fprintf(stderr, "Failed to receive weather response\n");
+		goto cleanup;
+	}
 
-	// TODO: Connect to server
-	// connect(...);
+	struct sockaddr_in peer_addr;
+	memset(&peer_addr, 0, sizeof(peer_addr));
+	socklen_t peer_len = sizeof(peer_addr);
+	if (getpeername(client_socket, (struct sockaddr*) &peer_addr, &peer_len) == 0) {
+		const char *resolved_ip = inet_ntoa(peer_addr.sin_addr);
+		if (resolved_ip != NULL) {
+			strncpy(server_ip, resolved_ip, sizeof(server_ip) - 1);
+		}
+	}
+	if (server_ip[0] == '\0') {
+		strncpy(server_ip, server_address, sizeof(server_ip) - 1);
+	}
+	server_ip[sizeof(server_ip) - 1] = '\0';
 
-	// TODO: Implement communication logic
-	// send(...);
-	// recv(...);
+	if (format_response_message(&response, &request, server_ip, response_message, sizeof(response_message)) != 0) {
+		fprintf(stderr, "Unable to format server response\n");
+		goto cleanup;
+	}
 
-	// TODO: Close socket
-	// closesocket(my_socket);
+	printf("%s\n", response_message);
+	exit_code = EXIT_SUCCESS;
 
-	printf("Client terminated.\n");
-
+cleanup:
+	if (client_socket >= 0) {
+		closesocket(client_socket);
+	}
 	clearwinsock();
-	return 0;
+	return exit_code;
 } // main end
