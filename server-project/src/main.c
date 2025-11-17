@@ -186,6 +186,86 @@ int create_listening_socket(unsigned short port) {
 	return listen_socket;
 }
 
+void handle_client(int client_socket) {
+	weather_request_t request;
+	memset(&request, 0, sizeof(request));
+
+	size_t received_total = 0;
+	char *request_bytes = (char *)&request;
+	while (received_total < sizeof(request)) {
+		int received = recv(client_socket, request_bytes + received_total, (int)(sizeof(request) - received_total), 0);
+		if (received <= 0) {
+			if (received < 0) {
+				perror("recv() failed");
+			}
+			return;
+		}
+		received_total += (size_t)received;
+	}
+
+	request.city[sizeof(request.city) - 1] = '\0';
+
+	char client_ip[INET_ADDRSTRLEN] = "unknown";
+	struct sockaddr_in client_addr;
+	socklen_t client_addr_len = sizeof(client_addr);
+	if (getpeername(client_socket, (struct sockaddr *)&client_addr, &client_addr_len) == 0) {
+		if (inet_ntop(AF_INET, &(client_addr.sin_addr), client_ip, sizeof(client_ip)) == NULL) {
+			strcpy(client_ip, "unknown");
+		}
+	}
+
+	printf("Request '%c %s' from client ip %s\n", request.type, request.city, client_ip);
+
+	weather_response_t response;
+	memset(&response, 0, sizeof(response));
+	response.status = STATUS_INVALID_REQUEST;
+	response.type = '\0';
+	response.value = 0.0f;
+
+	const int valid_type = (request.type == 't' || request.type == 'h' || request.type == 'w' || request.type == 'p');
+	if (!valid_type) {
+		response.status = STATUS_INVALID_REQUEST;
+	} else if (!is_supported_city(request.city)) {
+		response.status = STATUS_CITY_NOT_AVAILABLE;
+	} else {
+		response.status = STATUS_SUCCESS;
+		response.type = request.type;
+
+		switch (request.type) {
+			case 't':
+				response.value = get_temperature();
+				break;
+			case 'h':
+				response.value = get_humidity();
+				break;
+			case 'w':
+				response.value = get_wind();
+				break;
+			case 'p':
+				response.value = get_pressure();
+				break;
+			default:
+				response.status = STATUS_INVALID_REQUEST;
+				response.type = '\0';
+				response.value = 0.0f;
+				break;
+		}
+	}
+
+	size_t sent_total = 0;
+	const char *response_bytes = (const char *)&response;
+	while (sent_total < sizeof(response)) {
+		int sent = send(client_socket, response_bytes + sent_total, (int)(sizeof(response) - sent_total), 0);
+		if (sent <= 0) {
+			if (sent < 0) {
+				perror("send() failed");
+			}
+			return;
+		}
+		sent_total += (size_t)sent;
+	}
+}
+
 int main(int argc, char *argv[]) {
 
 	// TODO: Implement server logic
