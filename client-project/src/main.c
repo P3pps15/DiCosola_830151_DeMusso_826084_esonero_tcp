@@ -114,6 +114,26 @@ int connect_to_server(const char *server_address, unsigned short port) {
 	return client_socket;
 }
 
+int send_weather_request(int socket_fd, const weather_request_t *request) {
+	if (socket_fd < 0 || request == NULL) {
+		return -1;
+	}
+
+	const char *buffer = (const char*) request;
+	const size_t total_size = sizeof(weather_request_t);
+	size_t sent_bytes = 0;
+
+	while (sent_bytes < total_size) {
+		int result = send(socket_fd, buffer + sent_bytes, (int) (total_size - sent_bytes), 0);
+		if (result <= 0) {
+			return -1;
+		}
+		sent_bytes += (size_t) result;
+	}
+
+	return 0;
+}
+
 int main(int argc, char *argv[]) {
 
 	// TODO: Implement client logic
