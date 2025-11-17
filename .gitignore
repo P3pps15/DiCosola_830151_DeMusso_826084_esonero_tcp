@@ -35,6 +35,9 @@
 *.i*86
 *.x86_64
 *.hex
+build/
+client-project/bin/
+server-project/bin/
 
 # Debug files
 *.dSYM/
