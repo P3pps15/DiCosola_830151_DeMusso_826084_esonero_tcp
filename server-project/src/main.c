@@ -56,6 +56,14 @@ float get_temperature(void) {
 	return min + normalized * (max - min);
 }
 
+float get_humidity(void) {
+	const float min = 20.0f;
+	const float max = 100.0f;
+	SEED_RNG_ONCE();
+	float normalized = (float)rand() / (float)RAND_MAX;
+	return min + normalized * (max - min);
+}
+
 int main(int argc, char *argv[]) {
 
 	// TODO: Implement server logic
