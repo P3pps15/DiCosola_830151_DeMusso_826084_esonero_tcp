@@ -134,6 +134,26 @@ int send_weather_request(int socket_fd, const weather_request_t *request) {
 	return 0;
 }
 
+int receive_weather_response(int socket_fd, weather_response_t *response) {
+	if (socket_fd < 0 || response == NULL) {
+		return -1;
+	}
+
+	char *buffer = (char*) response;
+	const size_t total_size = sizeof(weather_response_t);
+	size_t received_bytes = 0;
+
+	while (received_bytes < total_size) {
+		int result = recv(socket_fd, buffer + received_bytes, (int) (total_size - received_bytes), 0);
+		if (result <= 0) {
+			return -1;
+		}
+		received_bytes += (size_t) result;
+	}
+
+	return 0;
+}
+
 int main(int argc, char *argv[]) {
 
 	// TODO: Implement client logic
