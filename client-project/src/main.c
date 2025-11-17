@@ -154,6 +154,69 @@ int receive_weather_response(int socket_fd, weather_response_t *response) {
 	return 0;
 }
 
+int format_response_message(const weather_response_t *response,
+		const weather_request_t *request,
+		const char *server_ip,
+		char *out_buffer,
+		size_t out_size) {
+	if (response == NULL || server_ip == NULL || out_buffer == NULL || out_size == 0) {
+		return -1;
+	}
+
+	char city_label[MAX_CITY_LEN];
+	memset(city_label, 0, sizeof(city_label));
+
+	if (request != NULL && request->city[0] != '\0') {
+		strncpy(city_label, request->city, MAX_CITY_LEN - 1);
+		size_t len = strlen(city_label);
+		for (size_t i = 0; i < len; ++i) {
+			if (i == 0) {
+				city_label[i] = (char) toupper((unsigned char) city_label[i]);
+			} else {
+				city_label[i] = (char) tolower((unsigned char) city_label[i]);
+			}
+		}
+	}
+
+	char payload[RESPONSE_MESSAGE_LEN];
+	memset(payload, 0, sizeof(payload));
+
+	if (response->status == STATUS_SUCCESS) {
+		const char type = (char) tolower((unsigned char) response->type);
+		const char *city_output = city_label[0] != '\0' ? city_label : "Città";
+
+		switch (type) {
+		case 't':
+			snprintf(payload, sizeof(payload), "%s: Temperatura = %.1f°C", city_output, response->value);
+			break;
+		case 'h':
+			snprintf(payload, sizeof(payload), "%s: Umidità = %.1f%%", city_output, response->value);
+			break;
+		case 'w':
+			snprintf(payload, sizeof(payload), "%s: Vento = %.1f km/h", city_output, response->value);
+			break;
+		case 'p':
+			snprintf(payload, sizeof(payload), "%s: Pressione = %.1f hPa", city_output, response->value);
+			break;
+		default:
+			return -1;
+		}
+	} else if (response->status == STATUS_CITY_NOT_AVAILABLE) {
+		snprintf(payload, sizeof(payload), "Città non disponibile");
+	} else if (response->status == STATUS_INVALID_REQUEST) {
+		snprintf(payload, sizeof(payload), "Richiesta non valida");
+	} else {
+		snprintf(payload, sizeof(payload), "Risposta non valida");
+	}
+
+	int written = snprintf(out_buffer, out_size, "Ricevuto risultato dal server ip %s. %s", server_ip, payload);
+	if (written < 0 || (size_t) written >= out_size) {
+		return -1;
+	}
+
+	return 0;
+}
+
 int main(int argc, char *argv[]) {
 
 	// TODO: Implement client logic
