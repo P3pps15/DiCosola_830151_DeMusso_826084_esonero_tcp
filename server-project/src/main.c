@@ -115,6 +115,42 @@ int is_supported_city(const char *city) {
 	return 0;
 }
 
+int parse_arguments(int argc, char *argv[], unsigned short *port) {
+	if (port == NULL) {
+		return -1;
+	}
+
+	*port = DEFAULT_SERVER_PORT;
+
+	for (int i = 1; i < argc; ++i) {
+		if (strcmp(argv[i], "-p") == 0) {
+			if (i + 1 >= argc) {
+				fprintf(stderr, "Missing value for -p option.\n");
+				return -1;
+			}
+
+			char *endptr = NULL;
+			long value = strtol(argv[++i], &endptr, 10);
+			if (endptr == NULL || *endptr != '\0') {
+				fprintf(stderr, "Invalid port value: %s\n", argv[i]);
+				return -1;
+			}
+
+			if (value <= 0 || value > 65535) {
+				fprintf(stderr, "Port must be in range 1-65535.\n");
+				return -1;
+			}
+
+			*port = (unsigned short)value;
+		} else {
+			fprintf(stderr, "Unknown argument: %s\n", argv[i]);
+			return -1;
+		}
+	}
+
+	return 0;
+}
+
 int main(int argc, char *argv[]) {
 
 	// TODO: Implement server logic
