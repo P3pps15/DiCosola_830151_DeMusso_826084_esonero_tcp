@@ -8,19 +8,24 @@
 #ifndef PROTOCOL_H_
 #define PROTOCOL_H_
 
+#include <stddef.h>
+
 // Shared application parameters
 #define DEFAULT_SERVER_PORT 56700
+#define DEFAULT_SERVER_ADDRESS "127.0.0.1"
 #define BUFFER_SIZE 512
+#define MAX_CITY_LEN 64
+#define RESPONSE_MESSAGE_LEN 256
 #define QUEUE_SIZE 5
 
 // Application status codes
-#define STATUS_SUCCESS 0U
-#define STATUS_CITY_NOT_AVAILABLE 1U
-#define STATUS_INVALID_REQUEST 2U
+#define STATUS_SUCCESS 0
+#define STATUS_CITY_NOT_AVAILABLE 1
+#define STATUS_INVALID_REQUEST 2
 
 typedef struct {
-	char type;          // Weather data type: 't', 'h', 'w', 'p'
-	char city[64];      // Null-terminated city name
+	char type;                // Weather data type: 't', 'h', 'w', 'p'
+	char city[MAX_CITY_LEN];  // Null-terminated city name
 } weather_request_t;
 
 typedef struct {
