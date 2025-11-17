@@ -197,33 +197,33 @@ int format_response_message(const weather_response_t *response,
 
 	if (response->status == STATUS_SUCCESS) {
 		const char type = (char) tolower((unsigned char) response->type);
-		const char *city_output = city_label[0] != '\0' ? city_label : "Città";
+		const char *city_output = city_label[0] != '\0' ? city_label : "City";
 
 		switch (type) {
 		case 't':
-			snprintf(payload, sizeof(payload), "%s: Temperatura = %.1f°C", city_output, response->value);
+			snprintf(payload, sizeof(payload), "%s: Temperature = %.1f°C", city_output, response->value);
 			break;
 		case 'h':
-			snprintf(payload, sizeof(payload), "%s: Umidità = %.1f%%", city_output, response->value);
+			snprintf(payload, sizeof(payload), "%s: Humidity = %.1f%%", city_output, response->value);
 			break;
 		case 'w':
-			snprintf(payload, sizeof(payload), "%s: Vento = %.1f km/h", city_output, response->value);
+			snprintf(payload, sizeof(payload), "%s: Wind = %.1f km/h", city_output, response->value);
 			break;
 		case 'p':
-			snprintf(payload, sizeof(payload), "%s: Pressione = %.1f hPa", city_output, response->value);
+			snprintf(payload, sizeof(payload), "%s: Pressure = %.1f hPa", city_output, response->value);
 			break;
 		default:
 			return -1;
 		}
 	} else if (response->status == STATUS_CITY_NOT_AVAILABLE) {
-		snprintf(payload, sizeof(payload), "Città non disponibile");
+		snprintf(payload, sizeof(payload), "City not available");
 	} else if (response->status == STATUS_INVALID_REQUEST) {
-		snprintf(payload, sizeof(payload), "Richiesta non valida");
+		snprintf(payload, sizeof(payload), "Invalid request");
 	} else {
-		snprintf(payload, sizeof(payload), "Risposta non valida");
+		snprintf(payload, sizeof(payload), "Invalid response");
 	}
 
-	int written = snprintf(out_buffer, out_size, "Ricevuto risultato dal server ip %s. %s", server_ip, payload);
+	int written = snprintf(out_buffer, out_size, "Received result from server IP %s. %s", server_ip, payload);
 	if (written < 0 || (size_t) written >= out_size) {
 		return -1;
 	}
