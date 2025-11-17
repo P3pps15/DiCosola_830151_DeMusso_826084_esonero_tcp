@@ -72,6 +72,14 @@ float get_wind(void) {
 	return min + normalized * (max - min);
 }
 
+float get_pressure(void) {
+	const float min = 950.0f;
+	const float max = 1050.0f;
+	SEED_RNG_ONCE();
+	float normalized = (float)rand() / (float)RAND_MAX;
+	return min + normalized * (max - min);
+}
+
 int main(int argc, char *argv[]) {
 
 	// TODO: Implement server logic
