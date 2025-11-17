@@ -23,8 +23,15 @@
 
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 #include <time.h>
 #include "protocol.h"
+
+#if defined WIN32
+#ifndef strcasecmp
+#define strcasecmp _stricmp
+#endif
+#endif
 
 #define NO_ERROR 0
 #define SEED_RNG_ONCE() \
@@ -35,6 +42,19 @@
 			seeded = 1; \
 		} \
 	} while (0)
+
+static const char *SUPPORTED_CITIES[] = {
+	"Bari",
+	"Roma",
+	"Milano",
+	"Napoli",
+	"Torino",
+	"Palermo",
+	"Genova",
+	"Bologna",
+	"Firenze",
+	"Venezia"
+};
 
 void clearwinsock() {
 #if defined WIN32
@@ -78,6 +98,21 @@ float get_pressure(void) {
 	SEED_RNG_ONCE();
 	float normalized = (float)rand() / (float)RAND_MAX;
 	return min + normalized * (max - min);
+}
+
+int is_supported_city(const char *city) {
+	if (city == NULL) {
+		return 0;
+	}
+
+	const size_t total = sizeof(SUPPORTED_CITIES) / sizeof(SUPPORTED_CITIES[0]);
+	for (size_t i = 0; i < total; ++i) {
+		if (strcasecmp(city, SUPPORTED_CITIES[i]) == 0) {
+			return 1;
+		}
+	}
+
+	return 0;
 }
 
 int main(int argc, char *argv[]) {
