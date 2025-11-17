@@ -43,6 +43,7 @@
 		} \
 	} while (0)
 
+// List of valid cities accepted by the service (case-insensitive).
 static const char *SUPPORTED_CITIES[] = {
 	"Bari",
 	"Roma",
@@ -72,6 +73,7 @@ float get_temperature(void) {
 	const float min = -10.0f;
 	const float max = 40.0f;
 	SEED_RNG_ONCE();
+	// rand() / RAND_MAX produces [0,1]; scale to requested range.
 	float normalized = (float)rand() / (float)RAND_MAX;
 	return min + normalized * (max - min);
 }
@@ -192,6 +194,7 @@ void handle_client(int client_socket) {
 
 	size_t received_total = 0;
 	char *request_bytes = (char *)&request;
+	// Ensure the full request struct is received even if TCP fragments it.
 	while (received_total < sizeof(request)) {
 		int received = recv(client_socket, request_bytes + received_total, (int)(sizeof(request) - received_total), 0);
 		if (received <= 0) {
@@ -208,6 +211,7 @@ void handle_client(int client_socket) {
 	char client_ip[INET_ADDRSTRLEN] = "unknown";
 	struct sockaddr_in client_addr;
 	socklen_t client_addr_len = sizeof(client_addr);
+	// Retrieve client address for logging; ignore failures gracefully.
 	if (getpeername(client_socket, (struct sockaddr *)&client_addr, &client_addr_len) == 0) {
 		if (inet_ntop(AF_INET, &(client_addr.sin_addr), client_ip, sizeof(client_ip)) == NULL) {
 			strcpy(client_ip, "unknown");
@@ -254,6 +258,7 @@ void handle_client(int client_socket) {
 
 	size_t sent_total = 0;
 	const char *response_bytes = (const char *)&response;
+	// Send the entire response struct, handling partial writes.
 	while (sent_total < sizeof(response)) {
 		int sent = send(client_socket, response_bytes + sent_total, (int)(sizeof(response) - sent_total), 0);
 		if (sent <= 0) {
@@ -288,6 +293,7 @@ int main(int argc, char *argv[]) {
 	printf("Weather server listening on port %u\n", port);
 
 	while (1) {
+		printf("Waiting for incoming connections...\n");
 		struct sockaddr_in client_addr;
 		socklen_t client_addr_len = sizeof(client_addr);
 		int client_socket = accept(listen_socket, (struct sockaddr *)&client_addr, &client_addr_len);
