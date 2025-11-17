@@ -267,49 +267,40 @@ void handle_client(int client_socket) {
 }
 
 int main(int argc, char *argv[]) {
-
-	// TODO: Implement server logic
-
 #if defined WIN32
 	// Initialize Winsock
 	WSADATA wsa_data;
 	int result = WSAStartup(MAKEWORD(2,2), &wsa_data);
 	if (result != NO_ERROR) {
-		printf("Error at WSAStartup()\n");
-		return 0;
+		fprintf(stderr, "WSAStartup() failed: %d\n", result);
+		return EXIT_FAILURE;
 	}
 #endif
 
-	int my_socket;
-
-	// Create TCP socket
-	my_socket = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
-	if (my_socket < 0) {
-		error_handler("socket() failed");
+	unsigned short port;
+	if (parse_arguments(argc, argv, &port) < 0) {
+		fprintf(stderr, "Usage: %s [-p port]\n", argv[0]);
+		clearwinsock();
+		return EXIT_FAILURE;
 	}
 
-	// TODO: Configure server address
-	// struct sockaddr_in server_addr;
-	// server_addr.sin_family = AF_INET;
-	// server_addr.sin_port = htons(SERVER_PORT);
-	// server_addr.sin_addr.s_addr = INADDR_ANY;
+	int listen_socket = create_listening_socket(port);
+	printf("Weather server listening on port %u\n", port);
 
-	// TODO: Bind socket
-	// bind(...);
+	while (1) {
+		struct sockaddr_in client_addr;
+		socklen_t client_addr_len = sizeof(client_addr);
+		int client_socket = accept(listen_socket, (struct sockaddr *)&client_addr, &client_addr_len);
+		if (client_socket < 0) {
+			perror("accept() failed");
+			continue;
+		}
 
-	// TODO: Set socket to listen
-	// listen(...);
+		handle_client(client_socket);
+		closesocket(client_socket);
+	}
 
-	// TODO: Implement connection acceptance loop
-	// while (1) {
-	//     int client_socket = accept(...);
-	//     // Handle client communication
-	//     closesocket(client_socket);
-	// }
-
-	printf("Server terminated.\n");
-
-	closesocket(my_socket);
+	closesocket(listen_socket);
 	clearwinsock();
-	return 0;
+	return EXIT_SUCCESS;
 } // main end
