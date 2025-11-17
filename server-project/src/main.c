@@ -8,7 +8,8 @@
  */
 
 #if defined WIN32
-#include <winsock.h>
+#include <winsock2.h>
+#include <ws2tcpip.h>
 #else
 #include <string.h>
 #include <unistd.h>
@@ -48,8 +49,13 @@ int main(int argc, char *argv[]) {
 
 	int my_socket;
 
-	// TODO: Create socket
-	// my_socket = socket(...);
+	// Create TCP socket
+	my_socket = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
+	if (my_socket < 0) {
+		perror("socket() failed");
+		clearwinsock();
+		return EXIT_FAILURE;
+	}
 
 	// TODO: Configure server address
 	// struct sockaddr_in server_addr;
