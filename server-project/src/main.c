@@ -33,7 +33,9 @@
 #endif
 #endif
 
+#ifndef NO_ERROR
 #define NO_ERROR 0
+#endif
 #define SEED_RNG_ONCE() \
 	do { \
 		static int seeded = 0; \
@@ -127,25 +129,25 @@ int parse_arguments(int argc, char *argv[], unsigned short *port) {
 	for (int i = 1; i < argc; ++i) {
 		if (strcmp(argv[i], "-p") == 0) {
 			if (i + 1 >= argc) {
-				fprintf(stderr, "Missing value for -p option.\n");
+				fprintf(stderr, "Valore mancante per l'opzione -p.\n");
 				return -1;
 			}
 
 			char *endptr = NULL;
 			long value = strtol(argv[++i], &endptr, 10);
 			if (endptr == NULL || *endptr != '\0') {
-				fprintf(stderr, "Invalid port value: %s\n", argv[i]);
+				fprintf(stderr, "Valore di porta non valido: %s\n", argv[i]);
 				return -1;
 			}
 
 			if (value <= 0 || value > 65535) {
-				fprintf(stderr, "Port must be in range 1-65535.\n");
+				fprintf(stderr, "La porta deve essere nel range 1-65535.\n");
 				return -1;
 			}
 
 			*port = (unsigned short)value;
 		} else {
-			fprintf(stderr, "Unknown argument: %s\n", argv[i]);
+			fprintf(stderr, "Argomento sconosciuto: %s\n", argv[i]);
 			return -1;
 		}
 	}
@@ -165,24 +167,24 @@ struct sockaddr_in build_server_address(unsigned short port) {
 int create_listening_socket(unsigned short port) {
 	int listen_socket = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
 	if (listen_socket < 0) {
-		error_handler("socket() failed");
+		error_handler("socket() fallita");
 	}
 
 	int enable = 1;
 	if (setsockopt(listen_socket, SOL_SOCKET, SO_REUSEADDR, (char *)&enable, sizeof(enable)) < 0) {
 		closesocket(listen_socket);
-		error_handler("setsockopt() failed");
+		error_handler("setsockopt() fallita");
 	}
 
 	struct sockaddr_in server_addr = build_server_address(port);
 	if (bind(listen_socket, (struct sockaddr *)&server_addr, sizeof(server_addr)) < 0) {
 		closesocket(listen_socket);
-		error_handler("bind() failed");
+		error_handler("bind() fallita");
 	}
 
 	if (listen(listen_socket, QUEUE_SIZE) < 0) {
 		closesocket(listen_socket);
-		error_handler("listen() failed");
+		error_handler("listen() fallita");
 	}
 
 	return listen_socket;
@@ -199,7 +201,7 @@ void handle_client(int client_socket) {
 		int received = recv(client_socket, request_bytes + received_total, (int)(sizeof(request) - received_total), 0);
 		if (received <= 0) {
 			if (received < 0) {
-				perror("recv() failed");
+				perror("recv() fallita");
 			}
 			return;
 		}
@@ -208,17 +210,17 @@ void handle_client(int client_socket) {
 
 	request.city[sizeof(request.city) - 1] = '\0';
 
-	char client_ip[INET_ADDRSTRLEN] = "unknown";
+	char client_ip[INET_ADDRSTRLEN] = "sconosciuto";
 	struct sockaddr_in client_addr;
 	socklen_t client_addr_len = sizeof(client_addr);
 	// Retrieve client address for logging; ignore failures gracefully.
 	if (getpeername(client_socket, (struct sockaddr *)&client_addr, &client_addr_len) == 0) {
 		if (inet_ntop(AF_INET, &(client_addr.sin_addr), client_ip, sizeof(client_ip)) == NULL) {
-			strcpy(client_ip, "unknown");
+			strcpy(client_ip, "sconosciuto");
 		}
 	}
 
-	printf("Request '%c %s' from client ip %s\n", request.type, request.city, client_ip);
+	printf("Richiesta '%c %s' dal client ip %s\n", request.type, request.city, client_ip);
 
 	weather_response_t response;
 	memset(&response, 0, sizeof(response));
@@ -263,7 +265,7 @@ void handle_client(int client_socket) {
 		int sent = send(client_socket, response_bytes + sent_total, (int)(sizeof(response) - sent_total), 0);
 		if (sent <= 0) {
 			if (sent < 0) {
-				perror("send() failed");
+				perror("send() fallita");
 			}
 			return;
 		}
@@ -277,28 +279,28 @@ int main(int argc, char *argv[]) {
 	WSADATA wsa_data;
 	int result = WSAStartup(MAKEWORD(2,2), &wsa_data);
 	if (result != NO_ERROR) {
-		fprintf(stderr, "WSAStartup() failed: %d\n", result);
+		fprintf(stderr, "WSAStartup() fallita: %d\n", result);
 		return EXIT_FAILURE;
 	}
 #endif
 
 	unsigned short port;
 	if (parse_arguments(argc, argv, &port) < 0) {
-		fprintf(stderr, "Usage: %s [-p port]\n", argv[0]);
+		fprintf(stderr, "Uso: %s [-p port]\n", argv[0]);
 		clearwinsock();
 		return EXIT_FAILURE;
 	}
 
 	int listen_socket = create_listening_socket(port);
-	printf("Weather server listening on port %u\n", port);
+	printf("Server meteo in ascolto sulla porta %u\n", port);
 
 	while (1) {
-		printf("Waiting for incoming connections...\n");
+		//printf("In attesa di connessioni in ingresso...\n"); TODO: Chiedere al professore se possiamo lasciare questo output
 		struct sockaddr_in client_addr;
 		socklen_t client_addr_len = sizeof(client_addr);
 		int client_socket = accept(listen_socket, (struct sockaddr *)&client_addr, &client_addr_len);
 		if (client_socket < 0) {
-			perror("accept() failed");
+			perror("accept() fallita");
 			continue;
 		}
 
