@@ -3,6 +3,7 @@ CFLAGS := -Wall -Wextra -pedantic -std=c11
 LDFLAGS :=
 
 ifeq ($(OS),Windows_NT)
+CFLAGS += -DWIN32 -D_WIN32_WINNT=0x0600
 LDFLAGS += -lws2_32
 endif
 

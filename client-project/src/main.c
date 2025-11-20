@@ -197,33 +197,33 @@ int format_response_message(const weather_response_t *response,
 
 	if (response->status == STATUS_SUCCESS) {
 		const char type = (char) tolower((unsigned char) response->type);
-		const char *city_output = city_label[0] != '\0' ? city_label : "City";
+		const char *city_output = city_label[0] != '\0' ? city_label : "Città";
 
 		switch (type) {
 		case 't':
-			snprintf(payload, sizeof(payload), "%s: Temperature = %.1f°C", city_output, response->value);
+			snprintf(payload, sizeof(payload), "%s: Temperatura = %.1f°C", city_output, response->value);
 			break;
 		case 'h':
-			snprintf(payload, sizeof(payload), "%s: Humidity = %.1f%%", city_output, response->value);
+			snprintf(payload, sizeof(payload), "%s: Umidità = %.1f%%", city_output, response->value);
 			break;
 		case 'w':
-			snprintf(payload, sizeof(payload), "%s: Wind = %.1f km/h", city_output, response->value);
+			snprintf(payload, sizeof(payload), "%s: Vento = %.1f km/h", city_output, response->value);
 			break;
 		case 'p':
-			snprintf(payload, sizeof(payload), "%s: Pressure = %.1f hPa", city_output, response->value);
+			snprintf(payload, sizeof(payload), "%s: Pressione = %.1f hPa", city_output, response->value);
 			break;
 		default:
 			return -1;
 		}
 	} else if (response->status == STATUS_CITY_NOT_AVAILABLE) {
-		snprintf(payload, sizeof(payload), "City not available");
+		snprintf(payload, sizeof(payload), "Città non disponibile");
 	} else if (response->status == STATUS_INVALID_REQUEST) {
-		snprintf(payload, sizeof(payload), "Invalid request");
+		snprintf(payload, sizeof(payload), "Richiesta non valida");
 	} else {
-		snprintf(payload, sizeof(payload), "Invalid response");
+		snprintf(payload, sizeof(payload), "Risposta non valida");
 	}
 
-	int written = snprintf(out_buffer, out_size, "Received result from server IP %s. %s", server_ip, payload);
+	int written = snprintf(out_buffer, out_size, "Ricevuto risultato dal server ip %s. %s", server_ip, payload);
 	if (written < 0 || (size_t) written >= out_size) {
 		return -1;
 	}
@@ -240,7 +240,7 @@ int main(int argc, char *argv[]) {
 	char server_ip[INET_ADDRSTRLEN] = {0};
 	char server_address[BUFFER_SIZE];
 	unsigned short server_port = DEFAULT_SERVER_PORT;
-	const char usage_format[] = "Usage: %s [-s server] [-p port] -r \"type city\"\n";
+	const char usage_format[] = "Uso: %s [-s server] [-p port] -r \"type city\"\n";
 
 	memset(&request, 0, sizeof(request));
 	memset(&response, 0, sizeof(response));
@@ -252,7 +252,7 @@ int main(int argc, char *argv[]) {
 	WSADATA wsa_data;
 	int startup_result = WSAStartup(MAKEWORD(2,2), &wsa_data);
 	if (startup_result != NO_ERROR) {
-		fprintf(stderr, "Error at WSAStartup()\n");
+		fprintf(stderr, "Errore in WSAStartup()\n");
 		return EXIT_FAILURE;
 	}
 #endif
@@ -262,7 +262,7 @@ int main(int argc, char *argv[]) {
 	for (int i = 1; i < argc; ++i) {
 		if (strcmp(argv[i], "-s") == 0) {
 			if (i + 1 >= argc) {
-				fprintf(stderr, "Missing value for -s option\n");
+				fprintf(stderr, "Valore mancante per l'opzione -s\n");
 				fprintf(stderr, usage_format, argv[0]);
 				goto cleanup;
 			}
@@ -270,56 +270,56 @@ int main(int argc, char *argv[]) {
 			server_address[sizeof(server_address) - 1] = '\0';
 		} else if (strcmp(argv[i], "-p") == 0) {
 			if (i + 1 >= argc) {
-				fprintf(stderr, "Missing value for -p option\n");
+				fprintf(stderr, "Valore mancante per l'opzione -p\n");
 				fprintf(stderr, usage_format, argv[0]);
 				goto cleanup;
 			}
 			char *endptr = NULL;
 			unsigned long port_value = strtoul(argv[++i], &endptr, 10);
 			if (endptr == NULL || *endptr != '\0' || port_value == 0 || port_value > 65535) {
-				fprintf(stderr, "Invalid port value: %s\n", argv[i]);
+				fprintf(stderr, "Valore di porta non valido: %s\n", argv[i]);
 				fprintf(stderr, usage_format, argv[0]);
 				goto cleanup;
 			}
 			server_port = (unsigned short) port_value;
 		} else if (strcmp(argv[i], "-r") == 0) {
 			if (i + 1 >= argc) {
-				fprintf(stderr, "Missing value for -r option\n");
+				fprintf(stderr, "Valore mancante per l'opzione -r\n");
 				fprintf(stderr, usage_format, argv[0]);
 				goto cleanup;
 			}
 			if (parse_request(argv[++i], &request) != 0) {
-				fprintf(stderr, "Invalid request format. Expected \"type city\".\n");
+				fprintf(stderr, "Formato richiesta non valido. Atteso \"type city\".\n");
 				fprintf(stderr, usage_format, argv[0]);
 				goto cleanup;
 			}
 			request_present = 1;
 		} else {
-			fprintf(stderr, "Unknown argument: %s\n", argv[i]);
+			fprintf(stderr, "Argomento sconosciuto: %s\n", argv[i]);
 			fprintf(stderr, usage_format, argv[0]);
 			goto cleanup;
 		}
 	}
 
 	if (!request_present) {
-		fprintf(stderr, "Missing required -r option\n");
+		fprintf(stderr, "Opzione -r obbligatoria mancante\n");
 		fprintf(stderr, usage_format, argv[0]);
 		goto cleanup;
 	}
 
 	client_socket = connect_to_server(server_address, server_port);
 	if (client_socket < 0) {
-		fprintf(stderr, "Unable to connect to %s:%u\n", server_address, server_port);
+		fprintf(stderr, "Impossibile connettersi a %s:%u\n", server_address, server_port);
 		goto cleanup;
 	}
 
 	if (send_weather_request(client_socket, &request) != 0) {
-		fprintf(stderr, "Failed to send weather request\n");
+		fprintf(stderr, "Invio della richiesta meteo non riuscito\n");
 		goto cleanup;
 	}
 
 	if (receive_weather_response(client_socket, &response) != 0) {
-		fprintf(stderr, "Failed to receive weather response\n");
+		fprintf(stderr, "Ricezione della risposta meteo non riuscita\n");
 		goto cleanup;
 	}
 
@@ -338,7 +338,7 @@ int main(int argc, char *argv[]) {
 	server_ip[sizeof(server_ip) - 1] = '\0';
 
 	if (format_response_message(&response, &request, server_ip, response_message, sizeof(response_message)) != 0) {
-		fprintf(stderr, "Unable to format server response\n");
+		fprintf(stderr, "Impossibile formattare la risposta del server\n");
 		goto cleanup;
 	}
 
